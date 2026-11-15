@@ -6,7 +6,7 @@
 # other overlays use. Spliced into gemini_test.j via include.
 
 # the API key the tests use: not a real one
-def const KEY as string init "AIzaFakeKeyForTests0123456789abcdefghij";
+def const KEY as string init "test-key-not-a-google-api-key-0123456789";
 
 # what separates the answers a fake gives one request in turn
 def const NEXT as string init "\n=====\n";
