@@ -126,14 +126,15 @@ export func cache(c as Client, name as string) {
  */
 export func caches(c as Client) {
     def out as list of CacheInfo init [];
-    for (def v in pages($c, "/cachedContents", "cachedContents", 1000, "caches")) {
+    for (def v in pages($c, "/cachedContents", "cachedContents", 1000, MAX_PAGES, "caches")) {
         $out[] = cacheFrom($v);
     }
     return $out;
 }
 
 /**
- * Give a cache a new TTL from now; the only change the API allows.
+ * Give a cache a new TTL from now; the only change the API allows. The
+ * request names the field it changes (`updateMask=ttl`).
  *
  * @param c {Client} the client
  * @param name {string} `cachedContents/<id>` or the bare id
@@ -144,7 +145,12 @@ export func caches(c as Client) {
 export func updateCacheTtl(c as Client, name as string, ttlSeconds as int) {
     def n as string init resourceName("cachedContents", $name);
     def body as json.Value init json.map({"ttl": ttlText($ttlSeconds)});
-    return cacheFrom(apiRequest($c, "PATCH", "/" + $n, json.encode($body), "updateCacheTtl " + $n));
+    return cacheFrom(apiRequest(
+        $c,
+        "PATCH",
+        "/" + $n + "?updateMask=ttl",
+        json.encode($body),
+        "updateCacheTtl " + $n));
 }
 
 /**

@@ -153,9 +153,9 @@ if ($why != "") {
 ```
 
 Code that skips the check still learns of it: `text` and `textJson` throw
-`GeminiError` kind `"gemini.blocked"`, `status` 200, `googleStatus` the
-reason, `reason`
-`PROMPT_BLOCKED` or `RESPONSE_BLOCKED`. `addReply` refuses a reply without
+`GeminiError` kind `"gemini.blocked"`, `status` 200, `blockReason` the
+reason (`googleStatus` `""`), `reason` `PROMPT_BLOCKED` or
+`RESPONSE_BLOCKED`. `addReply` refuses a reply without
 an answer.
 
 ## Counting tokens

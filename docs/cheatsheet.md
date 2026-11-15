@@ -15,9 +15,10 @@ A `c` argument is a `Client`; a `req` is a request (`json.Value`) from
 throws `GeminiError` (kind `"gemini"`) with the HTTP `status`, Google's
 `googleStatus` and the `ErrorInfo` `reason`; the deck's own refusals are
 the same struct with `status` 0. `text` and `textJson` of a reply without an
-answer throw `GeminiError` kind `"gemini.blocked"`. A cap is kind
-`"limit"`, a deadline `"timeout"`, a connection closed mid-answer
-`"closed"`, a cancelled task `"cancelled"`.
+answer throw `GeminiError` kind `"gemini.blocked"`, its `blockReason` the
+reason. A cap is kind `"limit"`, a deadline `"timeout"`, a network failure
+`"net"` (a `net.NetError`, passed on as it is), a connection closed
+mid-answer `"closed"`, a cancelled task `"cancelled"`.
 
 ## Constants
 
@@ -27,7 +28,7 @@ answer throw `GeminiError` kind `"gemini.blocked"`. A cap is kind
 | `DEFAULT_BASE_URL` | `"https://generativelanguage.googleapis.com"` | Google AI Studio's server |
 | `API_VERSION` | `"v1beta"` | the version every path is below |
 | `DEFAULT_TIMEOUT_MS` | `300000` | the deadline of one request |
-| `DEFAULT_RETRIES` | `3` | retries of a 408, 409, 429 or 5xx, or a connection refused or reset |
+| `DEFAULT_RETRIES` | `3` | retries of a 408, 409, 429 or 5xx, or a network failure before the request was sent |
 | `DEFAULT_BACKOFF_MS` | `1000` | the first retry's wait when the server names none |
 | `DEFAULT_MAX_BYTES` | `33554432` | the largest reply |
 | `MAX_RETRY_WAIT_MS` | `60000` | a server asking for a longer wait is not retried |
@@ -40,7 +41,8 @@ answer throw `GeminiError` kind `"gemini.blocked"`. A cap is kind
 | `MAX_TOOL_TURNS` | `100` | the most replies `runTools` asks for |
 | `TOOL_MODES` | `["AUTO", "ANY", "NONE", "VALIDATED"]` | what `withToolMode` takes |
 | `MAX_EMBED_BATCH` | `100` | texts per `batchEmbedContents` request |
-| `MAX_FILE_BYTES` | `2147483648` | the largest upload |
+| `MAX_FILE_BYTES` | `2000000000` | the largest upload, Google's 2 GB |
+| `MAX_FILE_PAGES` | `1000` | the most pages `files` reads (100 files each) |
 | `MAX_CACHE_TTL_SECONDS` | `31536000` | the longest cache TTL |
 
 ## The client
@@ -52,7 +54,7 @@ answer throw `GeminiError` kind `"gemini.blocked"`. A cap is kind
 | `withTls(c, tls)` | `Client` | certificate options (`caCert`, `skipVerify`) |
 | `withPlainHttp(c)` | `Client` | allow plain http to another machine |
 | `withTimeout(c, ms)` | `Client` | the deadline of one attempt, 1000 to 3600000 ms |
-| `withRetries(c, n)` | `Client` | retries of a 408, 409, 429 or 5xx, or a connection refused or reset, 0 to 10; an answer broken off mid-way is not retried |
+| `withRetries(c, n)` | `Client` | retries of a 408, 409, 429 or 5xx, or a network failure before the request was sent (`NetError.sent` false), 0 to 10; nothing sent in full is sent again |
 | `withBackoff(c, ms)` | `Client` | the first retry's wait when the server names none, 0 to 60000 ms |
 | `withMaxBytes(c, most)` | `Client` | the largest reply, 65536 to 1073741824 bytes |
 | `withMaxToolInput(c, most)` | `Client` | the largest arguments of a call the tool loop hands to a handler, 1024 to 1073741824 bytes as JSON; larger is answered with a `toolError` |
@@ -138,7 +140,7 @@ closest it offers. Check arguments before acting on them.
 | `createCache(c, req, ttlSeconds, displayName)` | `CacheInfo` | cache a request's prefix |
 | `cache(c, name)` | `CacheInfo` | one cache |
 | `caches(c)` | `list of CacheInfo` | every cache, all pages |
-| `updateCacheTtl(c, name, ttlSeconds)` | `CacheInfo` | a new TTL from now |
+| `updateCacheTtl(c, name, ttlSeconds)` | `CacheInfo` | a new TTL from now (`updateMask=ttl`) |
 | `deleteCache(c, name)` | `null` | delete a cache |
 
 ## Structs
@@ -152,7 +154,7 @@ closest it offers. Check arguments before acting on them.
 | `tls as http.TlsOptions` | certificate checks for https |
 | `allowPlainHttp as bool` | plain http to another machine allowed |
 | `timeoutMs as int` | the deadline of one attempt |
-| `retries as int` | retries of a 408, 409, 429 or 5xx, or a connection refused or reset |
+| `retries as int` | retries of a 408, 409, 429 or 5xx, or a network failure before the request was sent |
 | `backoffMs as int` | the first retry's wait when the server names none |
 | `maxBytes as int` | the largest reply |
 | `maxToolInput as int` | the largest arguments handed to a tool handler, bytes as JSON |
@@ -165,7 +167,8 @@ closest it offers. Check arguments before acting on them.
 | `kind as string` | `"gemini"` or `"gemini.blocked"` |
 | `message as string` | what happened, never the key |
 | `status as int` | the HTTP status; 0 without an answer; 200 when blocked |
-| `googleStatus as string` | Google's status name (`RESOURCE_EXHAUSTED`, ...), or the block reason |
+| `googleStatus as string` | Google's error status name (`RESOURCE_EXHAUSTED`, ...); `""` for a block |
+| `blockReason as string` | for kind `"gemini.blocked"`, the block or finish reason (`SAFETY`, `RECITATION`, ...) |
 | `reason as string` | the `ErrorInfo` reason (`API_KEY_INVALID`, ...), or `PROMPT_BLOCKED` / `RESPONSE_BLOCKED` |
 | `retryAfterMs as int` | the wait the server asked for (`retry-after-ms`, `retry-after`, `RetryInfo`), at most 1e12, 0 when none |
 | `limits as map of string to string` | the answer's rate-limit headers, names lower-cased (`x-ratelimit-*`, `retry-after`, `retry-after-ms`), at most 32 |

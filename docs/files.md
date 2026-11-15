@@ -44,10 +44,10 @@ protocol in two requests:
 
 The start is retried like any request. The data step is not: send the
 file again after a failure. It has its own deadline, 5 minutes plus 1
-minute per 100 MB begun (27 minutes for 2 GB), or what
+minute per 100 MB begun (25 minutes for 2 GB), or what
 `withUploadTimeout(c, ms)` sets; the client's `withTimeout` covers the
 other requests. The whole file is held in memory until `http`
-streams request bodies (M28.29).
+streams request bodies (M30.9).
 
 ## Processing, listing, deleting
 
@@ -62,4 +62,6 @@ kind `"gemini"` on `FAILED` and kind `"timeout"` when the time is up.
 | `files(c)` | every file of the project, all pages |
 | `deleteFile(c, name)` | delete it before it expires |
 
-A name is `files/<id>` or the bare id.
+`files` reads up to `MAX_FILE_PAGES` pages of 100 files (100,000 files);
+all pages together stay under the client's reply cap. A name is
+`files/<id>` or the bare id.

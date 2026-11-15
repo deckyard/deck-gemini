@@ -39,7 +39,7 @@ model) with a 400.
 |---|---|
 | `cache(c, name)` | one cache's metadata, with its `expireTime` and `totalTokens` |
 | `caches(c)` | every cache of the project, all pages |
-| `updateCacheTtl(c, name, ttlSeconds)` | a new TTL from now, the only change the API allows |
+| `updateCacheTtl(c, name, ttlSeconds)` | a new TTL from now, the only change the API allows (sent with `updateMask=ttl`) |
 | `deleteCache(c, name)` | delete it before it expires |
 
 A cache costs storage per hour until it expires (one hour by default in

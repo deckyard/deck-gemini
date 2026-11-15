@@ -7,7 +7,10 @@
 # for a file to be processed. Spliced into gemini.j via include.
 
 /** The largest file `uploadFile` sends, in bytes: Google's 2 GB. */
-export def const MAX_FILE_BYTES as int init 2147483648;
+export def const MAX_FILE_BYTES as int init 2000000000;
+
+/** The most pages `files` reads, 100 files each: up to 100,000 files (the reply cap still bounds them all together). */
+export def const MAX_FILE_PAGES as int init 1000;
 
 /**
  * A file in the Files API. Google deletes it 48 hours after the upload.
@@ -169,11 +172,11 @@ export func file(c as Client, name as string) {
  * @param c {Client} the client
  * @return {list of FileInfo} the files
  * @throws {GeminiError} kind "gemini" when the API refuses
- * @throws {Error} kind "limit" after `MAX_PAGES` pages, or when they are over the reply cap together
+ * @throws {Error} kind "limit" after `MAX_FILE_PAGES` pages, or when they are over the reply cap together
  */
 export func files(c as Client) {
     def out as list of FileInfo init [];
-    for (def v in pages($c, "/files", "files", 100, "files")) {
+    for (def v in pages($c, "/files", "files", 100, MAX_FILE_PAGES, "files")) {
         $out[] = fileFrom($v);
     }
     return $out;

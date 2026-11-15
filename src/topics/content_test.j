@@ -275,7 +275,8 @@ func testSafetyBlockIsDataUntilRead() {
         testing.assertEqual($e.kind, "gemini.blocked");
         def g as GeminiError init $e;
         testing.assertEqual($g.status, 200);
-        testing.assertEqual($g.googleStatus, "SAFETY");
+        testing.assertEqual($g.googleStatus, "");
+        testing.assertEqual($g.blockReason, "SAFETY");
         testing.assertEqual($g.reason, "PROMPT_BLOCKED");
         testing.assertContains($g.message, "the prompt was blocked (SAFETY)");
     }
@@ -294,7 +295,8 @@ func testSafetyBlockIsDataUntilRead() {
     } catch (e) {
         def g as GeminiError init $e;
         testing.assertEqual($g.kind, "gemini.blocked");
-        testing.assertEqual($g.googleStatus, "RECITATION");
+        testing.assertEqual($g.googleStatus, "");
+        testing.assertEqual($g.blockReason, "RECITATION");
         testing.assertEqual($g.reason, "RESPONSE_BLOCKED");
     }
     try {

@@ -543,8 +543,9 @@ func checkAnswered(reply as json.Value) {
         kind: "gemini.blocked",
         message: $message,
         status: 200,
-        googleStatus: cleaned($status, 64),
+        googleStatus: "",
         reason: $reason,
+        blockReason: cleaned($status, 64),
         retryAfterMs: 0,
         limits: {}
     };
@@ -578,7 +579,7 @@ func partTexts(reply as json.Value, thought as bool) {
  *
  * @param reply {json.Value} a reply of `chat`
  * @return {string} the text, `""` when the answer is only function calls
- * @throws {GeminiError} kind "gemini.blocked" (status 200, `googleStatus` the reason) when the prompt was blocked or the answer stopped for its content (`blockReason`); kind "gemini" when there is no candidate
+ * @throws {GeminiError} kind "gemini.blocked" (status 200, `blockReason` the reason) when the prompt was blocked or the answer stopped for its content (`blockReason`); kind "gemini" when there is no candidate
  * @example
  *   io.printf("%s\n", gemini.text($reply));
  */
@@ -613,6 +614,9 @@ export func textJson(reply as json.Value) {
     try {
         return json.decode($t);
     } catch (e) {
+        if ($e.kind == "limit") {
+            throw $e;
+        }
         fail("the answer is not JSON (finish reason " + shown(finishReason($reply)) + "): " +
             shown($t));
     }

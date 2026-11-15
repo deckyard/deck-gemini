@@ -15,7 +15,7 @@ export def const API_VERSION as string init "v1beta";
 /** How long one request may take, in milliseconds: 5 minutes, for long generations. */
 export def const DEFAULT_TIMEOUT_MS as int init 300000;
 
-/** How many times a 408, 409, 429 or 5xx answer, or a connection refused or reset, is retried. */
+/** How many times a 408, 409, 429 or 5xx answer, or a network failure before the request was sent, is retried. */
 export def const DEFAULT_RETRIES as int init 3;
 
 /** The wait before the first retry when the server names none, in milliseconds; it doubles per retry. */
@@ -67,7 +67,7 @@ def const LOOPBACK as list of string init ["127.0.0.1", "localhost", "[::1]"];
  * @field tls {http.TlsOptions} certificate checks for an `https` URL
  * @field allowPlainHttp {bool} whether plain `http` to another machine is allowed (the key then crosses the network in clear)
  * @field timeoutMs {int} how long one request may take
- * @field retries {int} how many times a 408, 409, 429 or 5xx answer, or a connection refused or reset, is retried
+ * @field retries {int} how many times a 408, 409, 429 or 5xx answer, or a network failure before the request was sent, is retried
  * @field backoffMs {int} the wait before the first retry when the server names none
  * @field maxBytes {int} the largest reply read
  * @field maxToolInput {int} the largest arguments of a function call the tool loop hands to a handler, in bytes as JSON
@@ -113,15 +113,17 @@ export def struct ModelInfo {
  * Every error of kind "gemini" or "gemini.blocked". Kind "gemini" is a
  * request the API refused (`status` is its HTTP status), or one this deck
  * refused or could not send (`status` 0). Kind "gemini.blocked" is `text`
- * or `textJson` of a reply without an answer: `status` 200, `googleStatus`
- * the block or finish reason. Caps, deadlines, closed connections and cancelled tasks
- * keep their generic kinds ("limit", "timeout", "closed", "cancelled").
+ * or `textJson` of a reply without an answer: `status` 200, `blockReason`
+ * the block or finish reason. Caps, deadlines, network failures, closed
+ * connections and cancelled tasks keep their generic kinds ("limit",
+ * "timeout", "net", "closed", "cancelled").
  *
  * @field kind {string} "gemini" or "gemini.blocked"
  * @field message {string} `gemini: <request>: <why> (HTTP <status> <googleStatus>)`; never the API key
  * @field status {int} the HTTP status (Google's `error.code`); 0 when no request was answered; 200 for a blocked reply
- * @field googleStatus {string} Google's status name, such as `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `NOT_FOUND`, `RESOURCE_EXHAUSTED`, `UNAVAILABLE`; for a blocked reply the reason, such as `SAFETY` or `RECITATION`; `""` when there is none
+ * @field googleStatus {string} Google's error status name, such as `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `NOT_FOUND`, `RESOURCE_EXHAUSTED`, `UNAVAILABLE`; `""` when there is none (always for a blocked reply)
  * @field reason {string} the `reason` of a `google.rpc.ErrorInfo` detail, such as `API_KEY_INVALID`; `PROMPT_BLOCKED` or `RESPONSE_BLOCKED` for a blocked reply; `""` when there is none
+ * @field blockReason {string} for a blocked reply (kind "gemini.blocked") the prompt's `blockReason` or the finish reason, such as `SAFETY`, `RECITATION` or `PROHIBITED_CONTENT`; `""` otherwise
  * @field retryAfterMs {int} how long the server asked to wait (`retry-after-ms`, `retry-after` or `RetryInfo.retryDelay`), in milliseconds, at most 1e12; 0 when it named no wait
  * @field limits {map of string to string} the answer's rate-limit headers, names lower-cased (`x-ratelimit-*`, `retry-after`, `retry-after-ms`), at most 32, values cleaned; empty when it sent none or there was no answer
  */
@@ -131,6 +133,7 @@ export def struct GeminiError {
     status as int,
     googleStatus as string,
     reason as string,
+    blockReason as string,
     retryAfterMs as int,
     limits as map of string to string
 };
@@ -148,6 +151,7 @@ func fail(message as string) {
         status: 0,
         googleStatus: "",
         reason: "",
+        blockReason: "",
         retryAfterMs: 0,
         limits: {}
     };
@@ -347,11 +351,11 @@ export func withTimeout(c as Client, ms as int) {
 
 /**
  * The client retrying another number of times: a 408, 409, 429 or 5xx
- * answer, and a connection refused or reset (not one the server closed
- * before answering).
- * Every method is retried, a `generateContent` too (Google bills only
- * answered requests), but no request whose answer broke off mid-way is
- * sent again. An upload's data step is not retried.
+ * answer, and a network failure (kind "net") before the whole request was
+ * sent (a refused connection, a failed lookup or handshake, a reset while
+ * sending). Every method is retried, a `generateContent` too (Google bills
+ * only answered requests), but no request that was sent in full and then
+ * failed is sent again. An upload's data step is not retried.
  *
  * @param c {Client} the client
  * @param n {int} 0 (no retries) to 10
@@ -473,13 +477,17 @@ func resourceName(collection as string, name as string) {
  * @field response {http.BytesResponse} the answer, any status; empty when `failure` is set
  * @field failure {string} why no answer was read, `""` when one was
  * @field closed {bool} whether the server closed the connection mid-answer (kind "closed")
- * @field dropped {bool} whether the connection was refused or reset (kind "runtime" from `http` / `net`, which DNS and TLS failures share): the failures worth another try
+ * @field dropped {bool} whether the network failed before the whole request was sent (a `net.NetError` with `sent` false): the one failure worth another try
+ * @field isNet {bool} whether the failure is a `net.NetError`, passed on as it is
+ * @field netError {net.NetError} that error, when `isNet`
  */
 def struct Attempt {
     response as http.BytesResponse,
     failure as string,
     closed as bool,
-    dropped as bool
+    dropped as bool,
+    isNet as bool,
+    netError as net.NetError
 };
 
 /**
@@ -540,12 +548,15 @@ func attempt(
         return http.requestWithBytes($method, $url, $sent, $body, $timeoutMs, $maxBytes, $tls);
     };
     def none as http.BytesResponse;
+    def noNet as net.NetError;
     try {
         return Attempt{
             response: task.waitTimeout($t, $timeoutMs),
             failure: "",
             closed: false,
-            dropped: false
+            dropped: false,
+            isNet: false,
+            netError: $noNet
         };
     } catch (e) {
         if ($e.kind == "cancelled") {
@@ -570,7 +581,23 @@ func attempt(
                 failure: $what + ": the server closed the connection: " +
                     redacted($c, $e.message, 300),
                 closed: true,
-                dropped: false
+                dropped: false,
+                isNet: false,
+                netError: $noNet
+            };
+        }
+        if ($e.kind == "net") {
+            # sent false: the server cannot have acted on it, so it is safe to
+            # send again; after the whole request (a reset or a close before or
+            # during the answer) it may have been carried out
+            def ne as net.NetError init $e;
+            return Attempt{
+                response: $none,
+                failure: $what + ": " + redacted($c, $ne.message, 300),
+                closed: false,
+                dropped: not $ne.sent,
+                isNet: true,
+                netError: $ne
             };
         }
         return Attempt{
@@ -578,18 +605,25 @@ func attempt(
             failure: $what + ": cannot reach " + shown($c.baseUrl) + ": " +
                 redacted($c, $e.message, 300),
             closed: false,
-            dropped: $e.kind == "runtime"
+            dropped: false,
+            isNet: false,
+            netError: $noNet
         };
     }
 }
 
 /**
- * Throw an attempt's failure: kind "closed" when the server closed the
- * connection mid-answer, else kind "gemini" (status 0).
+ * Throw an attempt's failure: the `net.NetError` unchanged (kind "net", a
+ * generic kind), kind "closed" when the server closed the connection
+ * mid-answer, else kind "gemini" (status 0).
  *
  * @param a {Attempt} the attempt
  */
 func failAttempt(a as Attempt) {
+    if ($a.isNet) {
+        def ne as net.NetError init $a.netError;
+        throw $ne;
+    }
     if ($a.closed) {
         throw Error{kind: "closed", message: "gemini: " + $a.failure};
     }
@@ -645,11 +679,12 @@ func retryable(status as int) {
 
 /**
  * Send a request, retrying as the client allows: a 408, 409, 429 or 5xx
- * answer, and a connection refused or reset (kind "runtime" from `http`,
- * which DNS and TLS failures share). A connection the server closed before
- * any byte of an answer (kind "http") is not retried, nor is one whose
- * answer broke off mid-way (kind "closed"), whatever the method: it may
- * have been carried out.
+ * answer, and a `net.NetError` (kind "net") with `sent` false: refused,
+ * unreachable, a failed lookup or handshake, a reset before the whole
+ * request was written. Once the request was sent in full nothing is sent
+ * again, whatever the method: a reset or close (`sent` true, `replied` true
+ * or false) or an answer broken off mid-way (kind "closed") may come after
+ * the server acted on it.
  *
  * @param c {Client} the client
  * @param method {string} the HTTP method
@@ -914,6 +949,7 @@ func checkStatus(c as Client, r as http.BytesResponse, what as string) {
         status: $r.status,
         googleStatus: $status,
         reason: $reason,
+        blockReason: "",
         retryAfterMs: namedWait($r),
         limits: rateLimits($r)
     };
@@ -939,6 +975,10 @@ func jsonBody(r as http.BytesResponse, what as string) {
     try {
         return json.decode($text);
     } catch (e) {
+        if ($e.kind == "limit") {
+            # json's nesting and node caps: a generic kind, passed on
+            throw $e;
+        }
         fail($what + ": the reply is not JSON: " + shown($text));
     }
 }
@@ -1063,15 +1103,22 @@ func textsAt(v as json.Value, ptr as string) {
  * @param path {string} the collection's path, such as `/models`
  * @param key {string} the key of the items in each page, such as `models`
  * @param pageSize {int} the items asked for per page
+ * @param most {int} the most pages read, such as `MAX_PAGES`
  * @param what {string} the request, for messages
  * @return {list of json.Value} the items
- * @throws {Error} kind "limit" after `MAX_PAGES` pages, or when the pages together are over the reply cap
+ * @throws {Error} kind "limit" after `most` pages, or when the pages together are over the reply cap
  */
-func pages(c as Client, path as string, key as string, pageSize as int, what as string) {
+func pages(
+    c as Client,
+    path as string,
+    key as string,
+    pageSize as int,
+    most as int,
+    what as string) {
     def items as list of json.Value init [];
     def token as string init "";
     def read as int init 0;
-    for (def n in 0..MAX_PAGES) {
+    for (def n in 0..$most) {
         def query as string init "?pageSize=" + convert.toString($pageSize);
         if ($token != "") {
             $query = $query + "&pageToken=" + uri.encode($token);
@@ -1103,7 +1150,7 @@ func pages(c as Client, path as string, key as string, pageSize as int, what as 
             return $items;
         }
     }
-    failLimit(io.sprintf("%s: more than %d pages", $what, MAX_PAGES));
+    failLimit(io.sprintf("%s: more than %d pages", $what, $most));
 }
 
 /**
@@ -1139,7 +1186,7 @@ func modelFrom(v as json.Value) {
  */
 export func models(c as Client) {
     def out as list of ModelInfo init [];
-    for (def v in pages($c, "/models", "models", 1000, "models")) {
+    for (def v in pages($c, "/models", "models", 1000, MAX_PAGES, "models")) {
         $out[] = modelFrom($v);
     }
     return $out;

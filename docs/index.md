@@ -61,7 +61,7 @@ io.printf("%s\n", gemini.text(gemini.chat($c, $req)));
 | Setting | Default | Range |
 |---|---|---|
 | `withTimeout(c, ms)` | 300000 ms per attempt | 1000 to 3600000 |
-| `withRetries(c, n)` | 3 retries of a 408, 409, 429 or 5xx, or a connection refused or reset | 0 to 10 |
+| `withRetries(c, n)` | 3 retries of a 408, 409, 429 or 5xx, or a network failure before the request was sent | 0 to 10 |
 | `withBackoff(c, ms)` | 1000 ms, doubled per retry, at most 30 s | 0 to 60000 |
 | `withMaxBytes(c, most)` | 32 MiB per reply | 64 KiB to 1 GiB |
 | `withBaseUrl(c, url)` | `https://generativelanguage.googleapis.com` | any http(s) URL |
@@ -70,11 +70,13 @@ io.printf("%s\n", gemini.text(gemini.chat($c, $req)));
 | `withMaxToolInput(c, most)` | 1 MiB of arguments per tool call | 1024 to 1073741824 |
 | `withUploadTimeout(c, ms)` | 5 min plus 1 min per 100 MB | 1000 to 86400000 |
 
-A 408, 409, 429 or 5xx answer is retried, and so is a connection refused
-or reset (and a DNS or TLS failure, which `http` reports the same way). A
-connection the server closed before answering is not retried, and no
-request whose answer broke off mid-way (kind `"closed"`) is sent again,
-whatever its method: it may have been carried out. A retry waits what the
+A 408, 409, 429 or 5xx answer is retried, and so is a network failure
+(kind `"net"`, a `net.NetError`) before the whole request was sent: a
+refused connection, a failed lookup or TLS handshake, a reset while
+sending (`sent` false). Once the request was sent in full nothing is sent
+again, whatever the method: a reset or a close before or during the
+answer (`sent` true) and an answer broken off mid-way (kind `"closed"`)
+may come after the server acted on it. A retry waits what the
 server asked for: the `retry-after-ms` header, else `retry-after` (seconds
 or an HTTP date), or the `retryDelay` of a `google.rpc.RetryInfo` in the
 error, whichever is longer. Otherwise it backs off from `withBackoff`,
@@ -121,10 +123,11 @@ follow the newest model.
 
 | Kind | Struct | When |
 |---|---|---|
-| `"gemini"` | `GeminiError` | the API refused a request (`status` its HTTP status), or the deck refused an argument or could not reach the server (`status` 0) |
+| `"gemini"` | `GeminiError` | the API refused a request (`status` its HTTP status), or the deck refused an argument or the answer was malformed (`status` 0) |
 | `"gemini.blocked"` | `GeminiError` | `text` or `textJson` of a reply without an answer: a blocked prompt or an answer stopped for its content |
 | `"limit"` | `Error` | a reply over the cap, a request over 100 MB, more pages than `MAX_PAGES` or pages over the reply cap together (a tool loop out of turns is not one: it returns with `stopped` `"maxTurns"`) |
 | `"timeout"` | `Error` | no answer within the deadline, a file still processing |
+| `"net"` | `net.NetError` | the network failed: `reason` `refused`, `reset`, `unreachable`, `dns`, `tls`, `closed` or `other`, `sent` and `replied` say how far the exchange got; passed on as it is |
 | `"closed"` | `Error` | the server closed the connection mid-answer |
 | `"cancelled"` | `Error` | the task running the call was cancelled |
 
@@ -162,13 +165,14 @@ and the reply holds what a caller needs to decide (the safety ratings,
 citations, the token usage, a partial answer). `chat` returns it and
 `blockReason(reply)` names it. It cannot pass unseen: `text` and
 `textJson` throw `GeminiError` kind `"gemini.blocked"` with `status` 200,
-`googleStatus` the reason and `reason` `PROMPT_BLOCKED` or `RESPONSE_BLOCKED`. See
+`blockReason` the reason (`googleStatus` stays `""`, as no Google error
+came) and `reason` `PROMPT_BLOCKED` or `RESPONSE_BLOCKED`. See
 [Generating content](generating.md#safety).
 
 ## Out of v1
 
 - **Streaming** (`streamGenerateContent`, server-sent events). `http`
-  cannot read a response incrementally yet; M28.29 adds that and an `sse`
+  cannot read a response incrementally yet; M30.9 adds that and an `sse`
   module, after which streaming is an addition here.
 - **The Interactions API** (`/v1beta/interactions`), Google's newer
   stateful interface, the Live API (WebSockets), the Batch API and file

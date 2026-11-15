@@ -60,7 +60,7 @@ func testCacheLifecycle() {
         "dGhlIG1hbnVhbA==");
     testing.assertEqual(
         $seen[3],
-        "PATCH /v1beta/cachedContents/4d2kd477o3pg|x-goog-api-key=" + KEY +
+        "PATCH /v1beta/cachedContents/4d2kd477o3pg?updateMask=ttl|x-goog-api-key=" + KEY +
             '|Content-Type=application/json|{"ttl":"600s"}');
     testing.assertEqual(
         json.asString(seenBody($seen[4]), "/cachedContent"),

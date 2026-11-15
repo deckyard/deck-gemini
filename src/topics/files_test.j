@@ -157,5 +157,24 @@ func testUploadHasItsOwnDeadline() {
     testing.assertEqual(uploadDeadline($c, 1), 360000);
     testing.assertEqual(uploadDeadline($c, 100000000), 360000);
     testing.assertEqual(uploadDeadline($c, 100000001), 420000);
-    testing.assertEqual(uploadDeadline($c, MAX_FILE_BYTES), 300000 + 22 * 60000);
+    testing.assertEqual(uploadDeadline($c, MAX_FILE_BYTES), 300000 + 20 * 60000);
+}
+
+func testFilesReadMorePagesThanModels() {
+    # 150 pages of one file each: past MAX_PAGES, within MAX_FILE_PAGES
+    def page as string init answer(
+        200,
+        '{"files": [{"name": "files/f", "mimeType": "text/plain", "state": "ACTIVE"}], "nextPageToken": "more"}');
+    def all as list of string init [];
+    for (def i in 0..149) {
+        $all[] = $page;
+    }
+    $all[] = answer(200, '{"files": [{"name": "files/last", "state": "ACTIVE"}]}');
+    def f as Fake init startFake({"GET /v1beta/files": strings.join($all, NEXT)});
+    def listed as list of FileInfo init files(fakeClient($f));
+    stopFake($f);
+    testing.assertEqual(len($listed), 150);
+    testing.assertEqual($listed[149].name, "files/last");
+    testing.assertEqual(MAX_FILE_PAGES, 1000);
+    testing.assertEqual(MAX_FILE_BYTES, 2000000000);
 }

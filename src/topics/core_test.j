@@ -467,7 +467,9 @@ def struct RawFake {
 
 /**
  * Start a raw fake. Each connection reads one request and gets the next
- * reply as it is (`""`: closed at once, before any byte of an answer).
+ * reply as it is (`""`: closed at once, before any byte of an answer;
+ * `ABORT`: reset before the request is read; `ABORT <bytes>`: the bytes,
+ * then a reset).
  *
  * @param replies {list of string} one reply per connection, in turn
  * @return {RawFake} the fake
@@ -498,8 +500,20 @@ func serveRaw(l as net.Listener, replies as list of string) {
             return $n;
         }
         $n = $n + 1;
+        if ($reply == "ABORT") {
+            # reset at once, before the request is read
+            net.abort($conn);
+            continue;
+        }
         # read the whole request, so closing sends a FIN, not a reset
         readRequest($conn);
+        if (strings.startsWith($reply, "ABORT ")) {
+            # part of an answer, then a reset
+            net.writeBytes($conn, convert.bytesFromString("utf-8", $reply[6..]));
+            time.sleep(time.fromMilliseconds(50));
+            net.abort($conn);
+            continue;
+        }
         if ($reply != "") {
             net.writeBytes($conn, convert.bytesFromString("utf-8", $reply));
         }
@@ -566,7 +580,7 @@ func testDroppedConnections() {
     def full as string init "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 35\r\n\r\n" +
         '{"name": "models/gemini-3.8-flash"}';
     def mid as string init "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n" + '{';
-    # refused (kind "runtime"): tried again, and the server is up by then
+    # refused (a NetError, not sent): tried again, and the server is up by then
     def probe as net.Listener init net.listen("127.0.0.1:0");
     def address as string init net.address($probe);
     net.close($probe);
@@ -577,15 +591,44 @@ func testDroppedConnections() {
         model(withBaseUrl(withBackoff(client(KEY), 600), "http://" + $address), "gemini-3.8-flash").name,
         "models/gemini-3.8-flash");
     testing.assertEqual(task.wait($late), 1);
-    # closed by the server before any byte (kind "http"): not tried again
+    # closed by the server before any byte, the request sent: may have been
+    # carried out, not tried again; the NetError passes as it is
     def shut as RawFake init startRawFake(["", $full]);
     try {
         model(withBaseUrl(withBackoff(client(KEY), 0), $shut.base), "gemini-3.8-flash");
         missed("a closed connection");
     } catch (err) {
-        testing.assertEqual($err.kind, "gemini");
+        testing.assertEqual($err.kind, "net");
+        def ne as net.NetError init $err;
+        testing.assertEqual($ne.reason, "closed");
+        testing.assertTrue($ne.sent);
+        testing.assertFalse($ne.replied);
+        testing.assertFalse(strings.contains($ne.message, KEY));
     }
     testing.assertEqual(stopRawFake($shut), 1);
+    # reset before the request was written in full (32 MB the fake never
+    # reads): not sent, so tried again
+    def early as RawFake init startRawFake(["ABORT", $full]);
+    def big as json.Value init addUserText(
+        newRequest("gemini-3.8-flash"),
+        strings.repeat("x", 32000000));
+    def answered as json.Value init chat(
+        withBaseUrl(withBackoff(client(KEY), 0), $early.base),
+        $big);
+    testing.assertEqual(json.asString($answered, "/name"), "models/gemini-3.8-flash");
+    testing.assertEqual(stopRawFake($early), 2);
+    # reset after part of the answer: sent and replied, not tried again
+    def reset as RawFake init startRawFake(["ABORT " + $mid, $full]);
+    try {
+        model(withBaseUrl(withBackoff(client(KEY), 0), $reset.base), "gemini-3.8-flash");
+        missed("a reset answer");
+    } catch (err) {
+        testing.assertEqual($err.kind, "net");
+        def ne as net.NetError init $err;
+        testing.assertEqual($ne.reason, "reset");
+        testing.assertTrue($ne.sent);
+    }
+    testing.assertEqual(stopRawFake($reset), 1);
     # a GET that broke off mid-answer: not sent again either
     def g as RawFake init startRawFake([$mid, $full]);
     try {
@@ -710,9 +753,12 @@ func testUnreachable() {
         models(withBackoff(withBaseUrl(client(KEY), $base), 0));
         missed("nobody listening");
     } catch (e) {
-        testing.assertEqual($e.kind, "gemini");
-        testing.assertContains($e.message, "cannot reach");
-        testing.assertFalse(strings.contains($e.message, KEY));
+        # the generic kind "net", passed on as it came
+        testing.assertEqual($e.kind, "net");
+        def ne as net.NetError init $e;
+        testing.assertEqual($ne.reason, "refused");
+        testing.assertFalse($ne.sent);
+        testing.assertFalse(strings.contains($ne.message, KEY));
     }
 }
 
