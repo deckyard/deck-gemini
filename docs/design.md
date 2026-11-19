@@ -182,13 +182,3 @@ caching, embeddings, the model list).
 - Later: streaming responses (M30.9), bulk number reads from `json`
   (M29.8), streaming request bodies (M30.10) and a smaller `Value`
   (M29.11) would lift the limitations above.
-
-## History
-
-- 2026-11-14: built.
-- 2026-11-15: validated (a `retry-after` too long to read, the listings'
-  shared byte cap), then aligned with the openai and anthropic decks in four
-  rounds (the shared surface, `Usage`, `ToolRun.stopped`,
-  `withMaxToolInput`, the retry rule, `limits`, `blockReason`, the ranges,
-  the upload deadline, the file page cap and size), and moved to the
-  `net.NetError` transport errors.
