@@ -24,7 +24,6 @@ mid-answer `"closed"`, a cancelled task `"cancelled"`.
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `VERSION` | `"0.1.0"` | this deck's version |
 | `DEFAULT_BASE_URL` | `"https://generativelanguage.googleapis.com"` | Google AI Studio's server |
 | `API_VERSION` | `"v1beta"` | the version every path is below |
 | `DEFAULT_TIMEOUT_MS` | `300000` | the deadline of one request |
