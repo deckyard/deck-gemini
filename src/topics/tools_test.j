@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # gemini - white-box tests for the tools topic. Spliced into gemini_test.j
 # via include.
@@ -76,7 +76,7 @@ func weatherRequest() {
 func testToolsAndModes() {
     def d as json.Value init tool("now", "The time.", json.decode("null"));
     testing.assertEqual(json.encode($d), '{"name":"now","description":"The time."}');
-    for (def bad in ["", "9lives", "a b", strings.repeat("x", 129)]) {
+    for (def bad in ["", "9lives", "a b", strings.replicate("x", 129)]) {
         try {
             tool($bad, "", json.decode("null"));
             missed($bad);
@@ -300,7 +300,7 @@ func testToolInputCap() {
     def f as Fake init startFake({
         "POST /v1beta/models/gemini-3.8-flash:generateContent": answer(
             200,
-            strings.replace(OVERSIZED, 'CITYHERE', strings.repeat("x", 2000))) + NEXT +
+            strings.replace(OVERSIZED, 'CITYHERE', strings.replicate("x", 2000))) + NEXT +
             answer(200, ANSWERED)
     });
     def c as Client init withMaxToolInput(fakeClient($f), 1024);

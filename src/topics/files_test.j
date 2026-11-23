@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # gemini - white-box tests for the files topic. Spliced into gemini_test.j
 # via include.
@@ -72,7 +72,7 @@ func testUploadRefusals() {
         testing.assertContains($e.message, "a MIME type is");
     }
     try {
-        uploadFile($c, $one, "image/png", strings.repeat("n", 513));
+        uploadFile($c, $one, "image/png", strings.replicate("n", 513));
         missed("name");
     } catch (e) {
         testing.assertContains($e.message, "at most 512");
@@ -140,11 +140,11 @@ func testFilesGetListDeleteWait() {
 func testUploadHasItsOwnDeadline() {
     def f as Fake init startFake({
         "POST /upload/v1beta/files": "200\nX-Goog-Upload-Url: $BASE/upload/v1beta/files?upload_id=slow\n\n",
-        "POST /upload/v1beta/files?upload_id=slow": "SLOW 200\nContent-Type: application/json\n\n" +
+        "POST /upload/v1beta/files?upload_id=slow": "SLOW 1300 200\nContent-Type: application/json\n\n" +
             '{"file": ' + UPLOADED + '}'
     });
     def data as bytes init binary.make(4, 1);
-    # the requests' deadline is 1 s; the data step takes 1.5 s and has 5 min
+    # the requests' deadline is 1 s; the data step takes 1.3 s and has 5 min
     def c as Client init withTimeout(fakeClient($f), 1000);
     testing.assertEqual(uploadFile($c, $data, "audio/mpeg", "talk").name, "files/abc-123");
     try {

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # gemini - white-box tests for the core topic, and the fake server the
 # other overlays use. Spliced into gemini_test.j via include.
@@ -40,8 +40,8 @@ func missed(what as string) {
  * value` (`$BASE` in a value is the fake's URL), an empty line and the body.
  * Several answers joined by NEXT are given in turn, the last one again
  * after that. A request with no answer gets a Google 404; an answer whose
- * status is `SLEEP` waits 3 seconds; a status after `SLOW ` (`SLOW 200`) is
- * answered after 1.5 seconds.
+ * status is `SLEEP <ms>` waits that long and answers 200 `{}`; `SLOW <ms>
+ * <status>` (`SLOW 1300 200`) answers with that status after that long.
  *
  * @param answers {map of string to string} the answers
  * @return {Fake} the server
@@ -64,7 +64,7 @@ func startFake(answers as map of string to string) {
  */
 func bodyText(body as bytes) {
     try {
-        return convert.stringFromBytes("utf-8", $body);
+        return encoding.decode("utf-8", $body);
     } catch (e) {
         return "hex:" + encoding.toText("hex", $body);
     }
@@ -133,10 +133,11 @@ func serveFake(srv as httpd.Server, base as string, answers as map of string to 
             httpd.setHeader($req, $h[..$at], strings.replace($h[$at + 2..], "$BASE", $base));
         }
         if (strings.startsWith($head[0], "SLOW ")) {
-            time.sleep(time.fromMilliseconds(1500));
-            httpd.respond($req, convert.toInt($head[0][5..]), $spec[$split + 2..]);
-        } elseif ($head[0] == "SLEEP") {
-            time.sleep(time.fromMilliseconds(3000));
+            def slow as list of string init strings.split($head[0], " ");
+            time.sleep(time.fromMilliseconds(convert.toInt($slow[1])));
+            httpd.respond($req, convert.toInt($slow[2]), $spec[$split + 2..]);
+        } elseif (strings.startsWith($head[0], "SLEEP ")) {
+            time.sleep(time.fromMilliseconds(convert.toInt($head[0][len("SLEEP ")..])));
             httpd.respond($req, 200, '{}');
         } else {
             httpd.respond($req, convert.toInt($head[0]), $spec[$split + 2..]);
@@ -441,7 +442,7 @@ func testRetryAfterTooLongIsNotTaken() {
 func testPagesShareTheCap() {
     # each page is under the cap, but endless pages of it are not read
     def page as string init '{"models": [{"name": "models/m", "description": "' +
-        strings.repeat("x", 40000) + '"}], "nextPageToken": "more"}';
+        strings.replicate("x", 40000) + '"}], "nextPageToken": "more"}';
     def f as Fake init startFake({"GET /v1beta/models": answer(200, $page)});
     try {
         models(withMaxBytes(fakeClient($f), 65536));
@@ -509,13 +510,13 @@ func serveRaw(l as net.Listener, replies as list of string) {
         readRequest($conn);
         if (strings.startsWith($reply, "ABORT ")) {
             # part of an answer, then a reset
-            net.writeBytes($conn, convert.bytesFromString("utf-8", $reply[6..]));
+            net.writeBytes($conn, encoding.encode("utf-8", $reply[6..]));
             time.sleep(time.fromMilliseconds(50));
             net.abort($conn);
             continue;
         }
         if ($reply != "") {
-            net.writeBytes($conn, convert.bytesFromString("utf-8", $reply));
+            net.writeBytes($conn, encoding.encode("utf-8", $reply));
         }
         net.close($conn);
     }
@@ -530,7 +531,7 @@ func serveRaw(l as net.Listener, replies as list of string) {
 func readRequest(conn as net.Conn) {
     def got as bytes;
     def need as int init -1;
-    def crlf as bytes init convert.bytesFromString("utf-8", "\r\n\r\n");
+    def crlf as bytes init encoding.encode("utf-8", "\r\n\r\n");
     while ($need < 0 or len($got) < $need) {
         def more as bytes init net.readBytes($conn, 65536);
         if (len($more) == 0) {
@@ -541,7 +542,7 @@ func readRequest(conn as net.Conn) {
         if ($need >= 0 or $end < 0) {
             continue;
         }
-        def head as string init strings.lower(convert.stringFromBytes("utf-8", $got[..$end]));
+        def head as string init strings.lower(encoding.decode("utf-8", $got[..$end]));
         def m as regex.Match init regex.find('content-length: *([0-9]+)', $head);
         $need = $end + 4;
         if ($m.start >= 0) {
@@ -611,7 +612,7 @@ func testDroppedConnections() {
     def early as RawFake init startRawFake(["ABORT", $full]);
     def big as json.Value init addUserText(
         newRequest("gemini-3.8-flash"),
-        strings.repeat("x", 32000000));
+        strings.replicate("x", 32000000));
     def answered as json.Value init chat(
         withBaseUrl(withBackoff(client(KEY), 0), $early.base),
         $big);
@@ -719,12 +720,12 @@ func testRetryRules() {
 }
 
 func testCapAndDeadline() {
-    def big as string init strings.repeat("x", 70000);
+    def big as string init strings.replicate("x", 70000);
     def f as Fake init startFake({
         "GET /v1beta/models/big": answer(
             200,
             '{"name": "models/big", "description": "' + $big + '"}'),
-        "GET /v1beta/models/slow": "SLEEP\n\n"
+        "GET /v1beta/models/slow": "SLEEP 1250\n\n"
     });
     def c as Client init withMaxBytes(fakeClient($f), 65536);
     try {

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # gemini - core: the client and its settings, the HTTP exchange with its
 # deadline, cap and retries, errors, JSON readers, paging, `call` and the
@@ -542,7 +542,7 @@ func attempt(
                 status: $r.status,
                 statusText: $r.statusText,
                 headers: $r.headers,
-                body: convert.bytesFromString("utf-8", $r.body)
+                body: encoding.encode("utf-8", $r.body)
             };
         }
         return http.requestWithBytes($method, $url, $sent, $body, $timeoutMs, $maxBytes, $tls);
@@ -904,7 +904,7 @@ func errorBody(r as http.BytesResponse) {
         return $none;
     }
     try {
-        return json.decode(convert.stringFromBytes("utf-8", $r.body));
+        return json.decode(encoding.decode("utf-8", $r.body));
     } catch (e) {
         return $none;
     }
@@ -965,7 +965,7 @@ func checkStatus(c as Client, r as http.BytesResponse, what as string) {
 func jsonBody(r as http.BytesResponse, what as string) {
     def text as string init "";
     try {
-        $text = convert.stringFromBytes("utf-8", $r.body);
+        $text = encoding.decode("utf-8", $r.body);
     } catch (e) {
         fail($what + ": the reply is not UTF-8");
     }

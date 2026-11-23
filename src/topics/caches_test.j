@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # gemini - white-box tests for the caches topic. Spliced into gemini_test.j
 # via include.
@@ -29,7 +29,7 @@ func testCacheLifecycle() {
     $docs = addParts(
         $docs,
         "user",
-        [inlinePart("text/plain", convert.bytesFromString("utf-8", "the manual"))]);
+        [inlinePart("text/plain", encoding.encode("utf-8", "the manual"))]);
     $docs = withConfig($docs, "temperature", json.decode("0.5"));
     def made as CacheInfo init createCache($c, $docs, 300, "manual");
     def got as CacheInfo init cache($c, "cachedContents/4d2kd477o3pg");
@@ -77,7 +77,7 @@ func testCacheLifecycle() {
         }
     }
     try {
-        createCache($c, $docs, 60, strings.repeat("n", 129));
+        createCache($c, $docs, 60, strings.replicate("n", 129));
         missed("name");
     } catch (e) {
         testing.assertContains($e.message, "at most 128");
