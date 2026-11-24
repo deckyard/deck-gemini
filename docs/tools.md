@@ -30,8 +30,8 @@ $req = gemini.addUserText($req, "Is it warmer in Paris or in London?");
 Every declaration goes into one `tools[]` entry, `{"functionDeclarations":
 [...]}`; other tools there (such as `{"googleSearch": {}}`, set with
 `json.set`) stay, and a second tool of the same name is refused. There is
-no `withStrict`, unlike the openai and anthropic decks: Gemini has no
-strict mode for function schemas (an OpenAPI subset that steers the
+no `withStrict`, unlike the openai and anthropic decks: Gemini™ has no
+strict mode for function schemas (an OpenAPI™ subset that steers the
 model); `withToolMode` with `VALIDATED` is the closest it offers.
 `withToolMode(req, mode, allowed)` sets `toolConfig`: `AUTO` (the model
 decides), `ANY` (it must call one, of `allowed` when given), `NONE`, or

@@ -6,7 +6,7 @@
 Media too large to inline (a request is at most 100 MB in all), or used in
 several requests, goes through the Files API: upload it once, then refer
 to it with `filePart`. A file is at most 2 GB, a project holds at most
-20 GB, and Google deletes a file 48 hours after its upload.
+20 GB, and Google™ deletes a file 48 hours after its upload.
 
 ```jennifer
 import "@deckyard/gemini/" as gemini;

@@ -3,7 +3,7 @@
 
 # @deckyard/gemini
 
-A client for the [Google Gemini API](https://ai.google.dev/api) as Google
+A client for the [Google™ Gemini™ API](https://ai.google.dev/api) as Google
 AI Studio serves it (`generativelanguage.googleapis.com/v1beta`), over raw
 HTTPS. It generates content from text and media, with a system
 instruction, function calling and a tool loop, structured output, thinking
@@ -177,7 +177,7 @@ came) and `reason` `PROMPT_BLOCKED` or `RESPONSE_BLOCKED`. See
 - **The Interactions API** (`/v1beta/interactions`), Google's newer
   stateful interface, the Live API (WebSockets), the Batch API and file
   search stores. `call` reaches the plain HTTP ones.
-- **Vertex AI.** The same models through Google Cloud need another
+- **Vertex AI™.** The same models through Google Cloud need another
   configuration: an OAuth bearer token instead of the key (a service
   account's, through `oauthext.googleServiceAccount` with the
   `cloud-platform` scope, refreshed before it expires), regional endpoints
@@ -188,3 +188,11 @@ came) and `reason` `PROMPT_BLOCKED` or `RESPONSE_BLOCKED`. See
   mode and a path builder), planned for later.
 - **Multimodal embeddings** of `gemini-embedding-2` (images, audio, video):
   `embed` sends text; send other parts with `call`.
+
+## Trademarks
+
+Google™, Gemini™ and Vertex AI™ are trademarks of Google LLC. Other product
+and company names may be trademarks of their respective owners. They are
+used only to identify the products this deck works with. This deck is an
+independent project, not affiliated with, sponsored or endorsed by Google
+LLC.

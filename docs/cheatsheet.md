@@ -12,7 +12,7 @@ import "@deckyard/gemini/" as gemini;
 
 A `c` argument is a `Client`; a `req` is a request (`json.Value`) from
 `newRequest`; a `reply` is what `chat` returned. A request the API refused
-throws `GeminiError` (kind `"gemini"`) with the HTTP `status`, Google's
+throws `GeminiError` (kind `"gemini"`) with the HTTP `status`, Google™'s
 `googleStatus` and the `ErrorInfo` `reason`; the deck's own refusals are
 the same struct with `status` 0. `text` and `textJson` of a reply without an
 answer throw `GeminiError` kind `"gemini.blocked"`, its `blockReason` the
@@ -98,8 +98,8 @@ mid-answer `"closed"`, a cancelled task `"cancelled"`.
 
 ## Function calling
 
-Gemini has no strict mode for tools, so there is no `withStrict` (the
-openai and anthropic decks have one): its schemas are an OpenAPI subset
+Gemini™ has no strict mode for tools, so there is no `withStrict` (the
+openai and anthropic decks have one): its schemas are an OpenAPI™ subset
 that steers the model, and `withToolMode(req, "VALIDATED", [])` is the
 closest it offers. Check arguments before acting on them.
 

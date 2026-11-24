@@ -4,7 +4,7 @@
 # Generating content
 
 `chat(c, req)` sends a request to `models/<model>:generateContent` and
-returns Google's `GenerateContentResponse` as it came, a `json.Value`. The
+returns Google™'s `GenerateContentResponse` as it came, a `json.Value`. The
 builders below write the request; anything they do not cover is set with
 `json.set` or `withConfig`.
 
@@ -75,7 +75,7 @@ read `/candidates/<n>` with `json.get`.
 
 A conversation is the request with every turn in it. `addReply` adds the
 model's answer exactly as it came, thought parts and `thoughtSignature`s
-included (Gemini 3 and later want them back), then the next user turn
+included (Gemini™ 3 and later want them back), then the next user turn
 follows:
 
 ```jennifer

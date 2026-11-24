@@ -5,7 +5,7 @@
 
 ## Scope
 
-The deck is a thin client for the Gemini API as Google AI Studio serves it
+The deck is a thin client for the Gemini™ API as Google™ AI Studio serves it
 (`generativelanguage.googleapis.com/v1beta`, an API key in the
 `x-goog-api-key` header). It covers `generateContent` with media, a system
 instruction, function calling and a tool loop, structured output, thinking
@@ -24,7 +24,7 @@ Out of scope, on purpose:
 
 - **Streaming** (`streamGenerateContent`): `http` cannot read a response
   incrementally yet.
-- **Vertex AI**: OAuth tokens, regional endpoints and Cloud Storage URIs
+- **Vertex AI™**: OAuth tokens, regional endpoints and Cloud Storage URIs
   make it a client variant for later; requests, replies and errors keep
   their shape there.
 - **The Interactions API, the Live API, the Batch API and file search

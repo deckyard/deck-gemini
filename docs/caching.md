@@ -5,7 +5,7 @@
 
 A long prefix used by many requests (a manual, a codebase, a video, the
 same system instruction and tools) can be cached once; requests then name
-the cache and are billed less for the cached tokens. Gemini 2.5 and later
+the cache and are billed less for the cached tokens. Gemini™ 2.5 and later
 also cache implicitly, without any of this; explicit caches work with
 Gemini 2.5 and 3 models, not with Gemini 4.
 
@@ -43,5 +43,5 @@ model) with a 400.
 | `deleteCache(c, name)` | delete it before it expires |
 
 A cache costs storage per hour until it expires (one hour by default in
-Google's SDKs; here the TTL is always given). A name is
+Google™'s SDKs; here the TTL is always given). A name is
 `cachedContents/<id>` or the bare id.
