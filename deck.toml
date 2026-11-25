@@ -1,6 +1,6 @@
 [package]
 name = "@deckyard/gemini"
-version = "0.1.0"
+version = "0.2.0"
 description = "A client for the Google Gemini API: generate content with tools, structured output and thinking, embeddings, files, context caching"
 license = "LGPL-3.0-only"
 authors = ["mplx <mplx@jennifer-lang.dev>"]
@@ -14,4 +14,4 @@ homepage = "https://github.com/deckyard/deck-gemini"
 manual = "https://deckyard.github.io/deck-gemini/"
 
 [engines]
-jennifer = ">=0.27.0"
+jennifer = ">=0.28.0"

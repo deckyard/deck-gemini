@@ -45,7 +45,7 @@ conversation, a tool loop, a file upload) read it from `GEMINI_API_KEY`.
 
 ## Requirements
 
-Jennifer 0.27.0 or newer, the default binary: the deck opens network
+Jennifer 0.28.0 or newer, the default binary: the deck opens network
 connections (capability `net`), so it does not load on `jennifer-tiny`.
 No streaming yet (it waits for streaming `http`); no Vertex AI™ yet.
 
